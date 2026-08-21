@@ -34,9 +34,9 @@
 | **Số lượng mẫu huấn luyện** | 2,998 mẫu | 5,996 mẫu | Gấp 2 lần (+100%) |
 | **Accuracy (Tập đánh giá 500 mẫu)** | **0.6840** (68.40%) | **0.7540** (75.40%) | **+7.00%** |
 | **F1-Score (Weighted)** | **0.6830** | **0.7534** | **+0.0704** |
-| **Eval Gate (Ngưỡng >= 0.70)** | Đạt ngưỡng triển khai | Vượt trội $\ge 0.70$ | Sẵn sàng Production |
+| **Eval Gate (Ngưỡng >= 0.70)** | **Không đạt** ($0.6840 < 0.70$) | **Đạt** ($0.7540 \ge 0.70$) | Chỉ Phase 2 được phép triển khai |
 
-**Kết luận:** Khi được bổ sung 2,998 mẫu dữ liệu mới (`train_phase2.csv`), mô hình học thêm được nhiều phân phối dữ liệu đa dạng, giúp độ chính xác tăng vọt lên **75.40%**, vượt qua ngưỡng chất lượng (0.70) và tự động triển khai thành công lên Cloud VM.
+**Kết luận:** Model Phase 1 đạt 68.40% nên bị quality gate 0.70 chặn đúng thiết kế. Khi được bổ sung 2,998 mẫu dữ liệu mới (`train_phase2.csv`), accuracy tăng lên **75.40%**, vượt quality gate và đủ điều kiện so sánh với model production trước khi triển khai.
 
 ---
 
@@ -44,10 +44,10 @@
 
 1. **Data Versioning (DVC + GCS)**: Dữ liệu lớn được tách rời khỏi Git, lưu trữ an toàn tại `gs://mlops-wine-k3-2a202601339/dvc/` và đồng bộ qua con trỏ `.dvc`.
 2. **4-Stage CI/CD Pipeline (GitHub Actions)**:
-   - **Job 1 (Unit Test)**: Chạy 3 unit tests (`pytest tests/ -v`) trên synthetic data.
-   - **Job 2 (Train & Push)**: Auth Service Account $\rightarrow$ `dvc pull` $\rightarrow$ `train.py` $\rightarrow$ Đẩy `model.pkl` lên GCS.
-   - **Job 3 (Eval Gate)**: Kiểm tra chất lượng mô hình tự động ngắt pipeline nếu không đạt yêu cầu.
-   - **Job 4 (Deploy)**: SSH vào GCE VM (`136.85.48.92`), restart daemon `mlops-serve.service` và xác nhận Health Check.
+   - **Job 1 (Unit Test)**: Chạy 8 unit tests (`pytest tests/ -v`) cho training artifacts, quality gate và rollback guardrail.
+   - **Job 2 (Train & Push)**: Auth Service Account $\rightarrow$ `dvc pull` $\rightarrow$ `train.py` $\rightarrow$ đẩy model vào vùng `models/candidates/<GITHUB_SHA>/`.
+   - **Job 3 (Eval Gate)**: Yêu cầu accuracy $\ge 0.70$ và không thấp hơn model production; pipeline dừng ngay nếu vi phạm.
+   - **Job 4 (Deploy)**: Chỉ sau khi Eval thành công mới promote candidate thành `models/latest/`, SSH vào GCE VM, restart `mlops-serve.service` và xác nhận Health Check.
 3. **Serving API**: FastAPI daemonized bằng `systemd` trên Ubuntu 22.04 LTS, phục vụ suy luận thời gian thực tại `http://136.85.48.92:8000`.
 
 ---
@@ -66,6 +66,24 @@
 *MLflow UI hiển thị đầy đủ 9 lần chạy với các bộ siêu tham số khác nhau, các cột độ đo `accuracy` và `f1_score`:*
 
 ![MLflow UI Tracking](screenshots/MLflowUI.png)
+
+---
+
+### 📸 Minh chứng Bonus 1: Remote MLflow Tracking Trên DagsHub
+
+*MLflow UI được phục vụ trực tiếp tại DagsHub tracking URI của dự án. Ảnh xác nhận remote run đã hoàn thành thành công, source là `train.py` và model artifact là `sklearn`:*
+
+![DagsHub Remote MLflow Tracking](screenshots/DagsHub_MLflow_Remote.png)
+
+---
+
+### 📸 Minh chứng DVC và Production Artifacts Trên GCS
+
+*Google Cloud Storage SDK đã được dùng ở chế độ chỉ đọc để xác minh 5 DVC cache objects cùng `models/latest/model.pkl` và `models/latest/metrics.json`. Có thể chạy lại bằng `python scripts/verify_gcs_artifacts.py`:*
+
+![GCS DVC and Production Artifacts Verification](screenshots/GCS_Artifacts_Verification.png)
+
+Danh sách object và kích thước đầy đủ: [GCS_VERIFICATION.md](GCS_VERIFICATION.md).
 
 ---
 
@@ -106,7 +124,13 @@
 ### 🌟 Bonus 1: Tracking MLflow Từ Xa Với DagsHub (+4 điểm)
 Đã cấu hình tích hợp server MLflow Tracking từ xa miễn phí trên nền tảng **DagsHub**:
 * Repository DagsHub: `https://dagshub.com/codecuatai/Track2_Day21_2A202601339_TranVanTai`
+* MLflow Tracking UI: `https://dagshub.com/codecuatai/Track2_Day21_2A202601339_TranVanTai.mlflow`
 * Mã nguồn `src/train.py` và workflow `.github/workflows/mlops.yml` tự động nhận diện `MLFLOW_TRACKING_URI`, `MLFLOW_TRACKING_USERNAME`, `MLFLOW_TRACKING_PASSWORD` để đồng bộ các lần chạy trực tiếp lên DagsHub Cloud.
+* Workflow chủ động thất bại nếu thiếu bất kỳ remote tracking secret nào; mỗi run CI được gắn tag `source=github-actions` và `git_sha` để truy vết về commit nguồn.
+
+**Minh chứng remote run thực tế:**
+
+![DagsHub Remote MLflow Tracking](screenshots/DagsHub_MLflow_Remote.png)
 
 ---
 
@@ -149,7 +173,9 @@ Chi tiet Precision / Recall / F1 tung lop:
 Tích hợp kiểm tra an toàn trong Job `Eval` của GitHub Actions:
 * Pipeline tự động tải `metrics.json` của mô hình Production hiện tại trên Google Cloud Storage.
 * So sánh `new_model_accuracy` với `production_model_accuracy`.
-* Nếu mô hình mới bị suy giảm đáng kể ($new\_acc < current\_acc - 0.05$), pipeline tự động **hủy quá trình triển khai** để bảo vệ hệ thống Production.
+* Model mới được lưu cách ly dưới `models/candidates/<GITHUB_SHA>/`, không ghi đè production trước khi đánh giá.
+* Nếu $new\_acc < 0.70$ hoặc $new\_acc < production\_acc$, pipeline tự động **hủy quá trình triển khai**.
+* Chỉ Job `Deploy` sau khi toàn bộ gate thành công mới promote candidate sang `models/latest/`.
 
 ---
 
@@ -157,4 +183,3 @@ Tích hợp kiểm tra an toàn trong Job `Eval` của GitHub Actions:
 Tự động phân tích phân phối nhãn trước khi huấn luyện:
 * Tỷ lệ phân phối thực tế: Lớp 0 (36.86%), Lớp 1 (43.51%), Lớp 2 (19.63%).
 * Tự động phát hiện và cảnh báo nếu có lớp chiếm $< 10\%$, đồng thời lưu cấu trúc phân phối vào `outputs/metrics.json` để phục vụ Data Drift Monitoring.
-

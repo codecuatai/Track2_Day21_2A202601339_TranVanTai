@@ -13,10 +13,15 @@ from dotenv import load_dotenv
 # Tải biến môi trường từ .env nếu có
 load_dotenv()
 
-# BONUS 1: Ho tro Remote Tracking voi DagsHub neu co bien moi truong
-tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
+# BONUS 1: Ho tro Remote Tracking voi DagsHub neu co bien moi truong.
+# GitHub Actions gan secret chua cau hinh thanh chuoi rong, vi vay dung "or"
+# de van fallback an toan ve SQLite khi chay local.
+tracking_uri = os.environ.get("MLFLOW_TRACKING_URI") or "sqlite:///mlflow.db"
 mlflow.set_tracking_uri(tracking_uri)
+experiment_name = os.environ.get("MLFLOW_EXPERIMENT_NAME") or "wine-quality-ci"
+mlflow.set_experiment(experiment_name)
 print(f"MLflow Tracking URI: {tracking_uri}")
+print(f"MLflow Experiment: {experiment_name}")
 
 EVAL_THRESHOLD = 0.70
 
@@ -127,7 +132,14 @@ def train(
     X_eval = df_eval.drop(columns=["target"])
     y_eval = df_eval["target"]
 
-    with mlflow.start_run():
+    git_sha = os.environ.get("GITHUB_SHA", "local")
+    run_source = "github-actions" if os.environ.get("GITHUB_ACTIONS") else "local"
+    run_name = f"{params.get('model_type', 'random_forest')}-{git_sha[:7]}"
+
+    with mlflow.start_run(
+        run_name=run_name,
+        tags={"source": run_source, "git_sha": git_sha},
+    ):
         # Ghi nhan sieu tham so vao MLflow
         mlflow.log_params(params)
 

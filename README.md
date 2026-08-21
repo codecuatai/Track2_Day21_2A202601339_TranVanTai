@@ -24,17 +24,37 @@ Course: AIInAction - VinUni | Buổi: Day 21 - CI/CD cho AI Systems | Khoá: K3
 
 ---
 
-### 3. Minh Chứng Bước 2 – GitHub Actions CI/CD Pipeline 4 Jobs Thành Công
+### 3. Minh Chứng Bonus 1 – DagsHub Remote MLflow Tracking
+
+Remote tracking UI: `https://dagshub.com/codecuatai/Track2_Day21_2A202601339_TranVanTai.mlflow`
+
+Ảnh dưới đây xác nhận run đã được ghi trên MLflow server do DagsHub lưu trữ, với source `train.py` và model artifact `sklearn`:
+
+![DagsHub Remote MLflow Tracking](submission/screenshots/DagsHub_MLflow_Remote.png)
+
+---
+
+### 4. Minh Chứng DVC và Artifacts Trên Google Cloud Storage
+
+Kết quả được lấy trực tiếp bằng Google Cloud Storage SDK ở chế độ chỉ đọc. Script `scripts/verify_gcs_artifacts.py` kiểm tra DVC cache và hai production artifacts bắt buộc:
+
+![GCS DVC and Production Artifacts Verification](submission/screenshots/GCS_Artifacts_Verification.png)
+
+Chi tiết object và kích thước: [submission/GCS_VERIFICATION.md](submission/GCS_VERIFICATION.md).
+
+---
+
+### 5. Minh Chứng Bước 2 – GitHub Actions CI/CD Pipeline 4 Jobs Thành Công
 ![GitHub Actions 4 Jobs Success](submission/screenshots/GitHubActions_Success.png)
 
 ---
 
-### 4. Minh Chứng Bước 3 – Huấn Luyện Liên Tục Kích Hoạt Bởi Data Commit
+### 6. Minh Chứng Bước 3 – Huấn Luyện Liên Tục Kích Hoạt Bởi Data Commit
 ![GitHub Actions Step 3 Continuous Training](submission/screenshots/GitHubActions_Step3_ContinuousTraining.png)
 
 ---
 
-### 5. Xác Thực Live Endpoint Trên Cloud VM (`136.85.48.92:8000`)
+### 7. Xác Thực Live Endpoint Trên Cloud VM (`136.85.48.92:8000`)
 
 ```bash
 # 1. Healthcheck probe
@@ -320,6 +340,10 @@ Thay vì lưu MLflow vào file cục bộ (`sqlite:///mlflow.db`), kết nối �
 - Cập nhật `mlops.yml` để sử dụng tracking server của DagsHub thay vì file cục bộ.
 
 Kết quả: Mỗi lần chạy trong GitHub Actions sẽ được ghi lên DagsHub, có thể xem từ bất cứ đâu.
+
+Minh chứng remote run thực tế:
+
+![DagsHub Remote MLflow Tracking](submission/screenshots/DagsHub_MLflow_Remote.png)
 
 ### Bonus 2: Thí Nghiệm Với Nhiều Thuật Toán (4 điểm)
 

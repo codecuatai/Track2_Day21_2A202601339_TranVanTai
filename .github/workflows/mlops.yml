@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: mlops-production
+  cancel-in-progress: false
+
 
 jobs:
 
@@ -73,7 +77,13 @@ jobs:
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
           MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
           MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
-        run: python src/train.py
+          MLFLOW_EXPERIMENT_NAME: wine-quality-ci
+        run: |
+          # Khong cho phep job "xanh" neu remote tracking secrets chua duoc cau hinh.
+          test -n "$MLFLOW_TRACKING_URI"
+          test -n "$MLFLOW_TRACKING_USERNAME"
+          test -n "$MLFLOW_TRACKING_PASSWORD"
+          python src/train.py
 
 
       - name: Read metrics
@@ -83,8 +93,8 @@ jobs:
           ACC=$(python -c "import json; d=json.load(open('outputs/metrics.json')); print(d['accuracy'])")
           echo "accuracy=$ACC" >> $GITHUB_OUTPUT
 
-      - name: Upload model and metrics to Cloud Storage
-        # TODO 5 & BONUS 4: Upload model va metrics.json len Cloud Storage
+      - name: Upload candidate model and metrics to Cloud Storage
+        # Candidate duoc cach ly khoi models/latest cho den khi qua tat ca quality gates.
         env:
           CLOUD_BUCKET: ${{ secrets.CLOUD_BUCKET }}
         run: |
@@ -93,18 +103,17 @@ jobs:
           from google.cloud import storage
 
           bucket_name = os.environ["CLOUD_BUCKET"]
+          candidate_prefix = f"models/candidates/{os.environ['GITHUB_SHA']}"
           client = storage.Client()
           bucket = client.bucket(bucket_name)
-          
-          # Upload model.pkl
-          blob_model = bucket.blob("models/latest/model.pkl")
-          blob_model.upload_from_filename("models/model.pkl")
-          print(f"Uploaded models/model.pkl to gs://{bucket_name}/models/latest/model.pkl")
 
-          # Upload metrics.json cho Guardrail so sanh (Bonus 4)
-          blob_metrics = bucket.blob("models/latest/metrics.json")
+          blob_model = bucket.blob(f"{candidate_prefix}/model.pkl")
+          blob_model.upload_from_filename("models/model.pkl")
+          print(f"Uploaded candidate model to gs://{bucket_name}/{candidate_prefix}/model.pkl")
+
+          blob_metrics = bucket.blob(f"{candidate_prefix}/metrics.json")
           blob_metrics.upload_from_filename("outputs/metrics.json")
-          print(f"Uploaded outputs/metrics.json to gs://{bucket_name}/models/latest/metrics.json")
+          print(f"Uploaded candidate metrics to gs://{bucket_name}/{candidate_prefix}/metrics.json")
           EOF
 
       - name: Save metrics and performance report as artifact
@@ -119,8 +128,8 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # JOB 3 - EVAL
-  # Kiem tra nguong chat luong (accuracy >= 0.60) & Guardrail Rollback (Bonus 4).
-  # Pipeline dung lai o day neu mo hinh bi suy giam do chinh xac.
+  # Kiem tra nguong chat luong (accuracy >= 0.70) & Guardrail Rollback (Bonus 4).
+  # Pipeline dung lai neu candidate thap hon nguong hoac kem model production.
   # Chi chay khi Job 2 (Train) hoan thanh thanh cong.
   # ---------------------------------------------------------------------------
   eval:
@@ -143,47 +152,52 @@ jobs:
           echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json" >> $GITHUB_ENV
 
       - name: Check eval gate & model rollback guardrail
-        # BONUS 4: So sanh accuracy model moi voi model dang chay tren Cloud Storage
+        # BONUS 4: So sanh candidate voi metrics production truoc khi promote.
         env:
           CLOUD_BUCKET: ${{ secrets.CLOUD_BUCKET }}
         run: |
           python - <<'EOF'
-          import os
           import json
-          import sys
+          import os
+
           from google.cloud import storage
+          from src.eval_gate import QualityGateError, validate_candidate
 
           new_acc = float("${{ needs.train.outputs.accuracy }}")
-          print(f"--- [EVALUATION GATE] ---")
+          bucket_name = os.environ["CLOUD_BUCKET"]
+          candidate_prefix = f"models/candidates/{os.environ['GITHUB_SHA']}"
+
+          client = storage.Client()
+          bucket = client.bucket(bucket_name)
+
+          print("--- [EVALUATION GATE] ---")
           print(f"New Model Accuracy: {new_acc:.4f}")
 
-          # 1. Kiem tra nguong chat luong toi thieu
-          if new_acc < 0.60:
-              raise SystemExit(f"FAILED: accuracy {new_acc:.4f} < 0.60 (Minimum Quality Threshold). Deployment Aborted!")
-          print("PASSED: Model đạt ngưỡng chất lượng cơ bản (>= 0.60).")
+          production_acc = None
+          production_metrics = bucket.blob("models/latest/metrics.json")
+          if production_metrics.exists():
+              production_metrics.download_to_filename("/tmp/production_metrics.json")
+              with open("/tmp/production_metrics.json", encoding="utf-8") as f:
+                  production_acc = float(json.load(f)["accuracy"])
+              print(f"Production Model Accuracy: {production_acc:.4f}")
+          else:
+              print("No production metrics found; applying the minimum quality gate only.")
 
-          # 2. [BONUS 4]: Guardrail so sanh voi mo hinh cu
-          bucket_name = os.environ.get("CLOUD_BUCKET")
+          for filename in ("model.pkl", "metrics.json"):
+              candidate_blob = bucket.blob(f"{candidate_prefix}/{filename}")
+              if not candidate_blob.exists():
+                  raise SystemExit(
+                      f"FAILED: candidate artifact gs://{bucket_name}/"
+                      f"{candidate_prefix}/{filename} does not exist."
+                  )
+
           try:
-              client = storage.Client()
-              bucket = client.bucket(bucket_name)
-              blob = bucket.blob("models/latest/metrics.json")
-              if blob.exists():
-                  blob.download_to_filename("/tmp/prev_metrics.json")
-                  prev_data = json.load(open("/tmp/prev_metrics.json"))
-                  prev_acc = float(prev_data.get("accuracy", 0.0))
-                  print(f"--- [BONUS 4: MODEL ROLLBACK GUARDRAIL] ---")
-                  print(f"Current Deployed Model Accuracy: {prev_acc:.4f}")
-                  print(f"New Trained Model Accuracy:      {new_acc:.4f}")
+              validate_candidate(new_acc, production_acc)
+          except QualityGateError as exc:
+              raise SystemExit(f"FAILED: {exc}") from exc
 
-                  if new_acc < (prev_acc - 0.05): # Neu giam dang ke
-                      raise SystemExit(f"FAILED [ROLLBACK GUARDRAIL]: New model ({new_acc:.4f}) is degraded compared to production ({prev_acc:.4f}). Aborting deployment!")
-                  else:
-                      print(f"PASSED [ROLLBACK GUARDRAIL]: New model is safe and ready for deployment.")
-          except Exception as e:
-              print(f"Info: Could not perform rollback comparison ({e}). Proceeding normally.")
-
-          print("ALL EVAL GATES PASSED: Đang tiến hành triển khai lên Production VM...")
+          print("PASSED: accuracy >= 0.70 and candidate is not worse than production.")
+          print("ALL EVAL GATES PASSED: candidate is ready for production promotion.")
           EOF
 
 
@@ -198,6 +212,42 @@ jobs:
     needs: eval
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Cloud Storage dependency
+        run: pip install google-cloud-storage
+
+      - name: Authenticate to Cloud Storage
+        run: |
+          echo '${{ secrets.CLOUD_CREDENTIALS }}' > /tmp/sa-key.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json" >> $GITHUB_ENV
+
+      - name: Promote approved candidate to production
+        env:
+          CLOUD_BUCKET: ${{ secrets.CLOUD_BUCKET }}
+        run: |
+          python - <<'EOF'
+          import os
+          from google.cloud import storage
+
+          bucket_name = os.environ["CLOUD_BUCKET"]
+          candidate_prefix = f"models/candidates/{os.environ['GITHUB_SHA']}"
+          client = storage.Client()
+          bucket = client.bucket(bucket_name)
+
+          for filename in ("model.pkl", "metrics.json"):
+              source_name = f"{candidate_prefix}/{filename}"
+              destination_name = f"models/latest/{filename}"
+              source_blob = bucket.blob(source_name)
+              if not source_blob.exists():
+                  raise SystemExit(f"Candidate artifact is missing: gs://{bucket_name}/{source_name}")
+              bucket.copy_blob(source_blob, bucket, destination_name)
+              print(f"Promoted gs://{bucket_name}/{source_name} -> gs://{bucket_name}/{destination_name}")
+          EOF
 
       - name: SSH deploy to VM
         uses: appleboy/ssh-action@v1.0.3
