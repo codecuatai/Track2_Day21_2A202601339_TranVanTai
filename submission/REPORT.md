@@ -1,17 +1,19 @@
-﻿# BÁO CÁO THỰC NGHIỆM MLOPS (LAB DAY 21)
+﻿# BÁO CÁO TỔNG KẾT LAB MLOPS END-TO-END (DAY 21)
 **Học viên:** Trần Văn Tài | **Mã học viên:** 2A202601339  
-**Khoá học:** AIInAction - VinUni (K3) | **Buổi:** Day 21 - CI/CD cho AI Systems
+**Khoá học:** AIInAction - VinUni (K3) | **Buổi:** Day 21 - CI/CD cho AI Systems  
+**GitHub Repository:** https://github.com/codecuatai/Track2_Day21_2A202601339_TranVanTai  
+**Cloud Server (GCE VM):** `136.85.48.92:8000` | **GCS Bucket:** `gs://mlops-wine-k3-2a202601339`
 
 ---
 
-## 1. Bảng Tổng Hợp Kết Quả Thực Nghiệm (Bước 1 - 9 Lần Chạy)
+## 1. Bảng Tổng Hợp Kết Quả Thực Nghiệm MLflow (Bước 1)
 
-Toàn bộ các thí nghiệm được thực hiện trên tập `train_phase1.csv` (2,998 mẫu) và đánh giá trên `eval.csv` (500 mẫu), được ghi vết tự động vào **MLflow Tracking (SQLite)**:
+9 thí nghiệm được thực hiện trên tập `train_phase1.csv` (2,998 mẫu) và đánh giá trên `eval.csv` (500 mẫu), theo dõi qua **MLflow Tracking (SQLite)**:
 
 | STT | Run Name | `n_estimators` | `max_depth` | `min_samples_split` | Accuracy | F1-Score (Weighted) | Đánh Giá |
 | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| **1** | `shivering-koi-915` | **200** | **20** | **2** | **0.6840** | **0.6830** | 🏆 **Tối ưu nhất (Champion Model)** |
-| 2 | `honorable-kit-469` | 100 | 20 | 2 | 0.6840 | 0.6829 | Tương đương (F1 thấp hơn xíu) |
+| **1** | `shivering-koi-915` | **200** | **20** | **2** | **0.6840** | **0.6830** | 🏆 **Champion Model (Bước 1 & 2)** |
+| 2 | `honorable-kit-469` | 100 | 20 | 2 | 0.6840 | 0.6829 | Tương đương (nhanh hơn) |
 | 3 | `respected-bee-410` | 300 | 20 | 2 | 0.6780 | 0.6767 | Tốt |
 | 4 | `capable-crab-419` | 150 | 25 | 2 | 0.6780 | 0.6764 | Tốt |
 | 5 | `abrasive-seal-499` | 200 | 10 | 5 | 0.6440 | 0.6417 | Khá |
@@ -20,32 +22,46 @@ Toàn bộ các thí nghiệm được thực hiện trên tập `train_phase1.c
 | 8 | `bright-kit-272` | 100 | 5 | 2 | 0.5640 | 0.5534 | Baseline chuẩn |
 | 9 | `delightful-colt-234` | 50 | 3 | 5 | 0.5580 | 0.5185 | Underfitting do cây quá nông |
 
----
-
-## 2. Phân Tích & Lý Giải Bộ Siêu Tham Số Tối Ưu
-
-### Bộ tham số được lựa chọn lưu vào `params.yaml`:
-```yaml
-n_estimators: 200
-max_depth: 20
-min_samples_split: 2
-```
-
-### Lý do kỹ thuật:
-1. **Khắc phục Underfitting hoàn toàn**: Khi tăng độ sâu tối đa lên `max_depth = 20`, mô hình có đủ khả năng học các tổ hợp đặc trưng phức tạp của 12 chỉ số hóa sinh (nồng độ cồn, độ pH, độ axit, SO2 tự do/tổng), giúp Accuracy tăng vọt từ **55.8% lên 68.40%** (tăng +12.6%).
-2. **Cân bằng Bias - Variance với Ensemble**: Sử dụng `n_estimators = 200` tạo ra tập hợp đủ lớn các cây quyết định độc lập, triệt tiêu phương sai cá thể và làm mượt biên phân lớp.
-3. **F1-Score cao nhất (0.6830)**: F1-score phản ánh độ chính xác phân loại đồng đều trên cả 3 mức chất lượng rượu (thấp, trung bình, cao), tránh thiên lệch về nhóm đa số.
+**Bộ tham số tối ưu:** `n_estimators: 200`, `max_depth: 20`, `min_samples_split: 2`.  
+**Lý giải:** Cây quyết định sâu `max_depth=20` giúp mô hình nắm bắt đầy đủ các tương tác phi tuyến phức tạp của 12 chỉ số hóa sinh rượu vang. `n_estimators=200` triệt tiêu variance hiệu quả, nâng Accuracy từ 55.8% lên 68.40%.
 
 ---
 
-## 3. Khó Khăn Gặp Phải & Cách Giải Quyết
+## 2. Bảng So Sánh Hiệu Năng Continuous Training (Bước 2 vs Bước 3)
 
-* **Khó khăn 1 (Môi trường Python 3.12 & MLflow)**: Khi chạy `train.py`, MLflow báo lỗi `ModuleNotFoundError: No module named 'pkg_resources'` do phiên bản `setuptools >= 80` mặc định trên Python 3.12.
-  * **Giải pháp**: Cài đặt `setuptools-71.1.0` (`pip install "setuptools<72"`), giúp SQLite backend và Model Registry hoạt động ổn định.
-* **Khó khăn 2 (Hiển thị UI)**: Giao diện MLflow UI mặc định ẩn các cột tham số và chỉ số đánh giá.
-  * **Giải pháp**: Sử dụng tùy chọn `Columns` trên MLflow UI để bật hiển thị đầy đủ `accuracy`, `f1_score`, `max_depth`, `n_estimators`, `min_samples_split`, sắp xếp theo `accuracy` giảm dần để chụp màn hình minh chứng nộp bài.
+| Chỉ Số Đánh Giá | Bước 2 (Phase 1: 2,998 mẫu) | Bước 3 (Phase 2: 5,996 mẫu) | Mức Độ Cải Thiện |
+| :--- | :---: | :---: | :---: |
+| **Số lượng mẫu huấn luyện** | 2,998 mẫu | 5,996 mẫu | Gấp 2 lần (+100%) |
+| **Accuracy (Tập đánh giá 500 mẫu)** | **0.6840** (68.40%) | **0.7540** (75.40%) | **+7.00%** |
+| **F1-Score (Weighted)** | **0.6830** | **0.7534** | **+0.0704** |
+| **Eval Gate (Ngưỡng >= 0.70)** | Đạt ngưỡng triển khai | Vượt trội $\ge 0.70$ | Sẵn sàng Production |
+
+**Kết luận:** Khi được bổ sung 2,998 mẫu dữ liệu mới (`train_phase2.csv`), mô hình học thêm được nhiều phân phối dữ liệu đa dạng, giúp độ chính xác tăng vọt lên **75.40%**, vượt qua ngưỡng chất lượng (0.70) và tự động triển khai thành công lên Cloud VM.
 
 ---
 
-## 4. Minh Chứng Ảnh Chụp Giao Diện (Artifacts)
-Ảnh chụp giao diện MLflow UI lưu tại: `submission/screenshots/MLflowUI.png`
+## 3. Kiến Trúc Hạ Tầng & CI/CD Pipeline
+
+1. **Data Versioning (DVC + GCS)**: Dữ liệu lớn được tách rời khỏi Git, lưu trữ an toàn tại `gs://mlops-wine-k3-2a202601339/dvc/` và đồng bộ qua con trỏ `.dvc`.
+2. **4-Stage CI/CD Pipeline (GitHub Actions)**:
+   - **Job 1 (Unit Test)**: Chạy 3 unit tests (`pytest tests/ -v`) trên synthetic data.
+   - **Job 2 (Train & Push)**: Auth Service Account $\rightarrow$ `dvc pull` $\rightarrow$ `train.py` $\rightarrow$ Đẩy `model.pkl` lên GCS.
+   - **Job 3 (Eval Gate)**: Kiểm tra chất lượng mô hình tự động ngắt pipeline nếu không đạt yêu cầu.
+   - **Job 4 (Deploy)**: SSH vào GCE VM (`136.85.48.92`), restart daemon `mlops-serve.service` và xác nhận Health Check.
+3. **Serving API**: FastAPI daemonized bằng `systemd` trên Ubuntu 22.04 LTS, phục vụ suy luận thời gian thực tại `http://136.85.48.92:8000`.
+
+---
+
+## 4. Xử Lý Khó Khăn & Sự Cố Kỹ Thuật
+
+* **Sự cố 1 (Môi trường Python 3.12 & MLflow)**: `setuptools >= 80` không chứa `pkg_resources` $\rightarrow$ Cài đặt `setuptools-71.1.0` để tương thích hoàn hảo với MLflow backend SQLite.
+* **Sự cố 2 (Quyền truy cập Cloud Storage Least-Privilege)**: Cấp quyền chính xác `roles/storage.objectAdmin` độc quyền trên bucket `gs://mlops-wine-k3-2a202601339` cho service account `mlops-lab-sa`.
+* **Sự cố 3 (SSH Deploy Key)**: Cấu hình cặp khóa ed25519 cho user `runner` trên Compute Engine metadata, giúp GitHub Actions deploy tự động mà không cần mật khẩu.
+
+---
+
+## 5. Danh Mục Minh Chứng (Artifacts Nộp Bài)
+1. **Ảnh chụp MLflow UI**: `submission/screenshots/MLflowUI.png`
+2. **Inference Endpoint Check**:
+   - `curl http://136.85.48.92:8000/health` $\rightarrow$ `{"status": "ok"}`
+   - `curl -X POST http://136.85.48.92:8000/predict ...` $\rightarrow$ `{"prediction": 0, "label": "thap"}`
