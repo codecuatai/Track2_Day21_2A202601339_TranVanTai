@@ -1,4 +1,4 @@
-﻿# BÁO CÁO TỔNG KẾT LAB MLOPS END-TO-END (DAY 21)
+# BÁO CÁO TỔNG KẾT LAB MLOPS END-TO-END (DAY 21)
 **Học viên:** Trần Văn Tài | **Mã học viên:** 2A202601339  
 **Khoá học:** AIInAction - VinUni (K3) | **Buổi:** Day 21 - CI/CD cho AI Systems  
 **GitHub Repository:** https://github.com/codecuatai/Track2_Day21_2A202601339_TranVanTai  
@@ -61,7 +61,9 @@
 ---
 
 ## 5. Danh Mục Minh Chứng (Artifacts Nộp Bài)
-1. **Ảnh chụp MLflow UI**: `submission/screenshots/MLflowUI.png`
-2. **Inference Endpoint Check**:
+1. **Ảnh chụp MLflow UI (Bước 1)**: `submission/screenshots/MLflowUI.png`
+2. **Ảnh chụp GitHub Actions 4 Jobs Thành Công (Bước 2 & 3)**: `submission/screenshots/GitHubActions_Success.png`
+3. **Inference Endpoint Check (Production)**:
    - `curl http://136.85.48.92:8000/health` $\rightarrow$ `{"status": "ok"}`
    - `curl -X POST http://136.85.48.92:8000/predict ...` $\rightarrow$ `{"prediction": 0, "label": "thap"}`
+
