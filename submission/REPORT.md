@@ -62,8 +62,10 @@
 
 ## 5. Danh Mục Minh Chứng (Artifacts Nộp Bài)
 1. **Ảnh chụp MLflow UI (Bước 1)**: `submission/screenshots/MLflowUI.png`
-2. **Ảnh chụp GitHub Actions 4 Jobs Thành Công (Bước 2 & 3)**: `submission/screenshots/GitHubActions_Success.png`
-3. **Inference Endpoint Check (Production)**:
+2. **Ảnh chụp GitHub Actions 4 Jobs Thành Công (Bước 2)**: `submission/screenshots/GitHubActions_Success.png`
+3. **Ảnh chụp GitHub Actions Continuous Training kích hoạt bởi Data Commit (Bước 3)**: `submission/screenshots/GitHubActions_Step3_ContinuousTraining.png`
+4. **Inference Endpoint Check (Production)**:
    - `curl http://136.85.48.92:8000/health` $\rightarrow$ `{"status": "ok"}`
    - `curl -X POST http://136.85.48.92:8000/predict ...` $\rightarrow$ `{"prediction": 0, "label": "thap"}`
+
 
