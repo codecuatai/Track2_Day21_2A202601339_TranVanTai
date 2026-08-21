@@ -101,9 +101,17 @@
 
 ---
 
-## 6. Triển Khai Các Thách Thức Nâng Cao (Bonus Challenges - Tối Đa Điểm)
+## 6. Triển Khai Trọn Vẹn 5 Thách Thức Nâng Cao (Bonus Challenges: +20 Điểm Tối Đa)
+
+### 🌟 Bonus 1: Tracking MLflow Từ Xa Với DagsHub (+4 điểm)
+Đã cấu hình tích hợp server MLflow Tracking từ xa miễn phí trên nền tảng **DagsHub**:
+* Repository DagsHub: `https://dagshub.com/codecuatai/Track2_Day21_2A202601339_TranVanTai`
+* Mã nguồn `src/train.py` và workflow `.github/workflows/mlops.yml` tự động nhận diện `MLFLOW_TRACKING_URI`, `MLFLOW_TRACKING_USERNAME`, `MLFLOW_TRACKING_PASSWORD` để đồng bộ các lần chạy trực tiếp lên DagsHub Cloud.
+
+---
 
 ### 🌟 Bonus 2: Thí Nghiệm & So Sánh Nhiều Thuật Toán (+4 điểm)
+
 Đã mở rộng `src/train.py` và `params.yaml` với tham số `model_type` hỗ trợ 4 thuật toán: `random_forest`, `extra_trees`, `gradient_boosting`, `logistic_regression`.
 * **Kết quả so sánh trên tập đánh giá:**
   * **RandomForest (Champion):** `Accuracy = 0.7540` | `F1 = 0.7534`

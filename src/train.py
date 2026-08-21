@@ -13,7 +13,13 @@ from dotenv import load_dotenv
 # Tải biến môi trường từ .env nếu có
 load_dotenv()
 
+# BONUS 1: Ho tro Remote Tracking voi DagsHub neu co bien moi truong
+tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
+mlflow.set_tracking_uri(tracking_uri)
+print(f"MLflow Tracking URI: {tracking_uri}")
+
 EVAL_THRESHOLD = 0.70
+
 
 
 def check_data_distribution(df: pd.DataFrame) -> dict:
