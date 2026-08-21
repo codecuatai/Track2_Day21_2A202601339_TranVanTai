@@ -60,12 +60,44 @@
 
 ---
 
-## 5. Danh Mục Minh Chứng (Artifacts Nộp Bài)
-1. **Ảnh chụp MLflow UI (Bước 1)**: `submission/screenshots/MLflowUI.png`
-2. **Ảnh chụp GitHub Actions 4 Jobs Thành Công (Bước 2)**: `submission/screenshots/GitHubActions_Success.png`
-3. **Ảnh chụp GitHub Actions Continuous Training kích hoạt bởi Data Commit (Bước 3)**: `submission/screenshots/GitHubActions_Step3_ContinuousTraining.png`
-4. **Inference Endpoint Check (Production)**:
-   - `curl http://136.85.48.92:8000/health` $\rightarrow$ `{"status": "ok"}`
-   - `curl -X POST http://136.85.48.92:8000/predict ...` $\rightarrow$ `{"prediction": 0, "label": "thap"}`
+## 5. Danh Mục Minh Chứng Trực Quan (Artifacts Nộp Bài)
+
+### 📸 Minh chứng Bước 1: Theo Dõi Thí Nghiệm Trên MLflow UI
+*MLflow UI hiển thị đầy đủ 9 lần chạy với các bộ siêu tham số khác nhau, các cột độ đo `accuracy` và `f1_score`:*
+
+![MLflow UI Tracking](screenshots/MLflowUI.png)
+
+---
+
+### 📸 Minh chứng Bước 2: Pipeline CI/CD 4 Jobs Hoàn Thành Thành Công
+*GitHub Actions workflow hoàn thành cả 4 jobs (`Unit Test`, `Train`, `Eval`, `Deploy`) màu xanh lá cây và lưu trữ artifact `metrics`:*
+
+![GitHub Actions 4 Jobs Success](screenshots/GitHubActions_Success.png)
+
+---
+
+### 📸 Minh chứng Bước 3: Continuous Training Tự Động Kích Hoạt Bởi Data Commit
+*Pipeline tự động kích hoạt khi có commit dữ liệu mới `data: bo sung 2998 mau du lieu moi (train_phase2)` và triển khai mô hình mới:*
+
+![GitHub Actions Step 3 Continuous Training](screenshots/GitHubActions_Step3_ContinuousTraining.png)
+
+---
+
+### 🧪 Minh chứng Kiểm Thử Live Endpoint (GCE VM: `136.85.48.92:8000`)
+
+1. **Kiểm tra Healthcheck:**
+   ```bash
+   curl http://136.85.48.92:8000/health
+   # Kết quả: {"status": "ok"}
+   ```
+
+2. **Kiểm tra Suy luận Thời gian thực:**
+   ```bash
+   curl -X POST http://136.85.48.92:8000/predict \
+     -H "Content-Type: application/json" \
+     -d '{"features": [7.4, 0.70, 0.00, 1.9, 0.076, 11.0, 34.0, 0.9978, 3.51, 0.56, 9.4, 0]}'
+   # Kết quả: {"prediction": 0, "label": "thap"}
+   ```
+
 
 

@@ -1,13 +1,57 @@
 # Lab MLOps Thực Hành: Từ Thực Nghiệm Cục Bộ Đến Triển Khai Liên Tục
 
-Course: AIInAction - VinUni
-Buổi: Day 21 - CI/CD cho AI Systems
-Khoá: K3
+Course: AIInAction - VinUni | Buổi: Day 21 - CI/CD cho AI Systems | Khoá: K3  
+**Học viên:** Trần Văn Tài | **Mã học viên:** 2A202601339  
+**GitHub Repository:** https://github.com/codecuatai/Track2_Day21_2A202601339_TranVanTai  
+**Cloud Server (GCE VM):** `136.85.48.92:8000` | **GCS Bucket:** `gs://mlops-wine-k3-2a202601339`
 
+---
+
+## 🏆 Báo Cáo Nghiệm Thu & Minh Chứng Trực Quan (Artifacts)
+
+### 1. Bảng So Sánh Hiệu Năng Cả 3 Bước (Level 2 ML Automation)
+
+| Giai Đoạn | Số Mẫu Huấn Luyện | Siêu Tham Số Tối Ưu | Accuracy | F1-Score | Trạng Thái Hệ Thống |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **Bước 1 (Baseline)** | 2,998 mẫu | `n=50, d=3, s=5` | 0.5580 | 0.5185 | Underfitting do cây nông |
+| **Bước 1 & 2 (Champion)** | 2,998 mẫu | `n=200, d=20, s=2` | **0.6840** | **0.6830** | Tăng vọt **+12.6%** độ chính xác |
+| **Bước 3 (Continuous Training)** | **5,996 mẫu** | `n=200, d=20, s=2` | **0.7540** | **0.7534** | 🚀 **Vượt ngưỡng chất lượng ($\ge 0.70$)** |
+
+---
+
+### 2. Minh Chứng Bước 1 – Theo Dõi Thí Nghiệm MLflow UI
+![MLflow UI Tracking](submission/screenshots/MLflowUI.png)
+
+---
+
+### 3. Minh Chứng Bước 2 – GitHub Actions CI/CD Pipeline 4 Jobs Thành Công
+![GitHub Actions 4 Jobs Success](submission/screenshots/GitHubActions_Success.png)
+
+---
+
+### 4. Minh Chứng Bước 3 – Huấn Luyện Liên Tục Kích Hoạt Bởi Data Commit
+![GitHub Actions Step 3 Continuous Training](submission/screenshots/GitHubActions_Step3_ContinuousTraining.png)
+
+---
+
+### 5. Xác Thực Live Endpoint Trên Cloud VM (`136.85.48.92:8000`)
+
+```bash
+# 1. Healthcheck probe
+curl http://136.85.48.92:8000/health
+# Output: {"status": "ok"}
+
+# 2. Real-time Inference API (12 features)
+curl -X POST http://136.85.48.92:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"features": [7.4, 0.70, 0.00, 1.9, 0.076, 11.0, 34.0, 0.9978, 3.51, 0.56, 9.4, 0]}'
+# Output: {"prediction": 0, "label": "thap"}
+```
 
 ---
 
 ## Mục Tiêu Học Tập
+
 
 Sau khi hoàn thành lab này, bạn có khả năng:
 
