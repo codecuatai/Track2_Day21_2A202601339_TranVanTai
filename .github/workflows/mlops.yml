@@ -77,8 +77,8 @@ jobs:
           ACC=$(python -c "import json; d=json.load(open('outputs/metrics.json')); print(d['accuracy'])")
           echo "accuracy=$ACC" >> $GITHUB_OUTPUT
 
-      - name: Upload model to Cloud Storage
-        # TODO 5: Su dung cloud SDK de upload models/model.pkl len
+      - name: Upload model and metrics to Cloud Storage
+        # TODO 5 & BONUS 4: Upload model va metrics.json len Cloud Storage
         env:
           CLOUD_BUCKET: ${{ secrets.CLOUD_BUCKET }}
         run: |
@@ -89,22 +89,32 @@ jobs:
           bucket_name = os.environ["CLOUD_BUCKET"]
           client = storage.Client()
           bucket = client.bucket(bucket_name)
-          blob = bucket.blob("models/latest/model.pkl")
-          blob.upload_from_filename("models/model.pkl")
+          
+          # Upload model.pkl
+          blob_model = bucket.blob("models/latest/model.pkl")
+          blob_model.upload_from_filename("models/model.pkl")
           print(f"Uploaded models/model.pkl to gs://{bucket_name}/models/latest/model.pkl")
+
+          # Upload metrics.json cho Guardrail so sanh (Bonus 4)
+          blob_metrics = bucket.blob("models/latest/metrics.json")
+          blob_metrics.upload_from_filename("outputs/metrics.json")
+          print(f"Uploaded outputs/metrics.json to gs://{bucket_name}/models/latest/metrics.json")
           EOF
 
-      - name: Save metrics as artifact
+      - name: Save metrics and performance report as artifact
+        # BONUS 3: Luu tru ca metrics.json va report.txt thanh artifact
         uses: actions/upload-artifact@v4
         with:
-          name: metrics
-          path: outputs/metrics.json
+          name: performance-report
+          path: |
+            outputs/metrics.json
+            outputs/report.txt
 
 
   # ---------------------------------------------------------------------------
   # JOB 3 - EVAL
-  # Kiem tra nguong chat luong (accuracy >= 0.60).
-  # Pipeline dung lai o day neu mo hinh chua dat yeu cau.
+  # Kiem tra nguong chat luong (accuracy >= 0.60) & Guardrail Rollback (Bonus 4).
+  # Pipeline dung lai o day neu mo hinh bi suy giam do chinh xac.
   # Chi chay khi Job 2 (Train) hoan thanh thanh cong.
   # ---------------------------------------------------------------------------
   eval:
@@ -112,19 +122,64 @@ jobs:
     needs: train
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
 
-      - name: Check eval gate
-        # TODO 6: Doc accuracy tu output cua job train.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: pip install google-cloud-storage
+
+      - name: Authenticate to Cloud Storage
+        run: |
+          echo '${{ secrets.CLOUD_CREDENTIALS }}' > /tmp/sa-key.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json" >> $GITHUB_ENV
+
+      - name: Check eval gate & model rollback guardrail
+        # BONUS 4: So sanh accuracy model moi voi model dang chay tren Cloud Storage
+        env:
+          CLOUD_BUCKET: ${{ secrets.CLOUD_BUCKET }}
         run: |
           python - <<'EOF'
+          import os
+          import json
           import sys
+          from google.cloud import storage
 
-          acc = float("${{ needs.train.outputs.accuracy }}")
-          print(f"Evaluated Model Accuracy: {acc:.4f}")
-          if acc < 0.60:
-              raise SystemExit(f"FAILED: accuracy {acc:.4f} < 0.60. Huy deploy.")
-          print(f"PASSED: accuracy {acc:.4f} >= 0.60. Dang trien khai model.")
+          new_acc = float("${{ needs.train.outputs.accuracy }}")
+          print(f"--- [EVALUATION GATE] ---")
+          print(f"New Model Accuracy: {new_acc:.4f}")
+
+          # 1. Kiem tra nguong chat luong toi thieu
+          if new_acc < 0.60:
+              raise SystemExit(f"FAILED: accuracy {new_acc:.4f} < 0.60 (Minimum Quality Threshold). Deployment Aborted!")
+          print("PASSED: Model đạt ngưỡng chất lượng cơ bản (>= 0.60).")
+
+          # 2. [BONUS 4]: Guardrail so sanh voi mo hinh cu
+          bucket_name = os.environ.get("CLOUD_BUCKET")
+          try:
+              client = storage.Client()
+              bucket = client.bucket(bucket_name)
+              blob = bucket.blob("models/latest/metrics.json")
+              if blob.exists():
+                  blob.download_to_filename("/tmp/prev_metrics.json")
+                  prev_data = json.load(open("/tmp/prev_metrics.json"))
+                  prev_acc = float(prev_data.get("accuracy", 0.0))
+                  print(f"--- [BONUS 4: MODEL ROLLBACK GUARDRAIL] ---")
+                  print(f"Current Deployed Model Accuracy: {prev_acc:.4f}")
+                  print(f"New Trained Model Accuracy:      {new_acc:.4f}")
+
+                  if new_acc < (prev_acc - 0.05): # Neu giam dang ke
+                      raise SystemExit(f"FAILED [ROLLBACK GUARDRAIL]: New model ({new_acc:.4f}) is degraded compared to production ({prev_acc:.4f}). Aborting deployment!")
+                  else:
+                      print(f"PASSED [ROLLBACK GUARDRAIL]: New model is safe and ready for deployment.")
+          except Exception as e:
+              print(f"Info: Could not perform rollback comparison ({e}). Proceeding normally.")
+
+          print("ALL EVAL GATES PASSED: Đang tiến hành triển khai lên Production VM...")
           EOF
+
 
 
   # ---------------------------------------------------------------------------

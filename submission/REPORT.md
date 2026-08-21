@@ -99,5 +99,54 @@
    # Kết quả: {"prediction": 0, "label": "thap"}
    ```
 
+---
 
+## 6. Triển Khai Các Thách Thức Nâng Cao (Bonus Challenges - Tối Đa Điểm)
+
+### 🌟 Bonus 2: Thí Nghiệm & So Sánh Nhiều Thuật Toán (+4 điểm)
+Đã mở rộng `src/train.py` và `params.yaml` với tham số `model_type` hỗ trợ 4 thuật toán: `random_forest`, `extra_trees`, `gradient_boosting`, `logistic_regression`.
+* **Kết quả so sánh trên tập đánh giá:**
+  * **RandomForest (Champion):** `Accuracy = 0.7540` | `F1 = 0.7534`
+  * **ExtraTrees:** `Accuracy = 0.7420` | `F1 = 0.7417`
+  * **GradientBoosting:** `Accuracy = 0.6980` | `F1 = 0.6973`
+
+---
+
+### 🌟 Bonus 3: Báo Cáo Hiệu Suất Tự Động & Confusion Matrix (+4 điểm)
+Mỗi lần huấn luyện, hệ thống tự động tính toán ma trận nhầm lẫn và chỉ số chi tiết cho từng lớp xuất ra file `outputs/report.txt`, lưu trữ thành artifact `performance-report` trên GitHub Actions:
+```text
+===========================================================
+             BAO CAO HIEU SUAT MO HINH CHI TIET            
+===========================================================
+Do chinh xac tong the (Accuracy): 0.7540
+F1-Score (Weighted):             0.7534
+
+Ma Tran Nhap Nho (Confusion Matrix):
+       Pred_ 0 Pred_ 1 Pred_ 2
+True_ 0     139      32       2
+True_ 1      41     172      14
+True_ 2       0      34      66
+
+Chi tiet Precision / Recall / F1 tung lop:
+                precision    recall  f1-score   support
+      0 (thap)     0.7722    0.8035    0.7875       173
+1 (trung_binh)     0.7227    0.7577    0.7398       227
+       2 (cao)     0.8049    0.6600    0.7253       100
+===========================================================
+```
+
+---
+
+### 🌟 Bonus 4: Cơ Chế Guardrail Rollback Chống Suy Giảm Hiệu Năng (+4 điểm)
+Tích hợp kiểm tra an toàn trong Job `Eval` của GitHub Actions:
+* Pipeline tự động tải `metrics.json` của mô hình Production hiện tại trên Google Cloud Storage.
+* So sánh `new_model_accuracy` với `production_model_accuracy`.
+* Nếu mô hình mới bị suy giảm đáng kể ($new\_acc < current\_acc - 0.05$), pipeline tự động **hủy quá trình triển khai** để bảo vệ hệ thống Production.
+
+---
+
+### 🌟 Bonus 5: Cảnh Báo Lệch Lạc Dữ Liệu & Mất Cân Bằng Nhãn (+4 điểm)
+Tự động phân tích phân phối nhãn trước khi huấn luyện:
+* Tỷ lệ phân phối thực tế: Lớp 0 (36.86%), Lớp 1 (43.51%), Lớp 2 (19.63%).
+* Tự động phát hiện và cảnh báo nếu có lớp chiếm $< 10\%$, đồng thời lưu cấu trúc phân phối vào `outputs/metrics.json` để phục vụ Data Drift Monitoring.
 

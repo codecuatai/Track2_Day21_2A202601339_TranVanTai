@@ -1,7 +1,9 @@
-# Sieu tham so cho mo hinh RandomForestClassifier (Buoc 2 - CI/CD Pipeline)
+# Sieu tham so cho mo hinh (Ho tro: random_forest, extra_trees, gradient_boosting)
+model_type: random_forest
 n_estimators: 200
 max_depth: 20
 min_samples_split: 2
+
 
 
 

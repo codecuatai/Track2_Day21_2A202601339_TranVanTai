@@ -69,14 +69,16 @@ def test_metrics_file_created(tmp_path):
 
     # TODO 8: Kiem tra file ton tai va noi dung dung dinh dang
     assert os.path.exists("outputs/metrics.json")
-    with open("outputs/metrics.json") as f:
+    with open("outputs/metrics.json", encoding="utf-8") as f:
         metrics = json.load(f)
     assert "accuracy" in metrics
     assert "f1_score" in metrics
+    assert "class_distribution" in metrics
+    assert "model_type" in metrics
 
 
 def test_model_file_created(tmp_path):
-    """Kiem tra file models/model.pkl duoc tao sau khi huan luyen."""
+    """Kiem tra file models/model.pkl va outputs/report.txt duoc tao sau khi huan luyen."""
     train_path, eval_path = _make_temp_data(tmp_path)
     train(
         {"n_estimators": 10, "max_depth": 3},
@@ -84,6 +86,12 @@ def test_model_file_created(tmp_path):
         eval_path=eval_path,
     )
 
-    # TODO 9: Kiem tra file model ton tai
+    # TODO 9: Kiem tra file model va report.txt ton tai
     assert os.path.exists("models/model.pkl")
+    assert os.path.exists("outputs/report.txt")
+    with open("outputs/report.txt", encoding="utf-8") as f:
+        content = f.read()
+    assert "Confusion Matrix" in content or "Ma Tran Nhap Nho" in content
+    assert "Precision" in content
+
 
